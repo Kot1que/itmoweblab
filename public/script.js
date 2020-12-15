@@ -1,7 +1,6 @@
-class OpenWeatherApi {
-    constructor(token) {
-        this.apiToken = token;
-        this.baseUrl = "https://api.openweathermap.org/data/2.5/weather?units=metric&"
+class Api {
+    constructor() {
+        this.baseUrl = "http://localhost:8080/"
     }
 
     timeout(ms, promise) {
@@ -16,7 +15,22 @@ class OpenWeatherApi {
     getWeatherByCityName(city) {
         return this.timeout(
             3000,
-            fetch(this.baseUrl + "q=" + city + "&appid=" + this.apiToken)
+            fetch(this.baseUrl + "weather/city?q=" + city)
+        ).catch(function(error) {
+            alert("Network failure");
+            return Promise.reject(error);
+        }).then(function(response) {
+            if (response.status !== 200) {
+                return response.status;
+            }
+            return response.json();
+        })
+    }
+
+    getWeatherByCoordinates(latitude, longitude) {
+        return this.timeout(
+            3000,
+            fetch(this.baseUrl + "weather/coordinates?lon=" + longitude + "&lat=" + latitude)
         ).catch(function(error) {
             alert("Network failure");
             return Promise.reject(error);
@@ -25,28 +39,51 @@ class OpenWeatherApi {
         })
     }
 
-    getWeatherByCoordinates(latitude, longitude) {
-        this.timeout(
+    getFavourites() {
+        return this.timeout(
             3000,
-            fetch(this.baseUrl + "lon=" + longitude + "&lat=" + latitude + "&appid=" + this.apiToken)
-        ).then(function(response) {
-            return response.json();
-        }).catch(function() {
+            fetch(this.baseUrl + "favourites")
+        ).catch(function(error) {
             alert("Network failure");
-        }).then(function (json) {
-            loadMainCity(json)
+            return Promise.reject(error);
+        }).then(function(response) {
+            return response.json();
+        })
+    }
+
+    deleteFavourite(id) {
+        return this.timeout(
+            3000,
+            fetch(this.baseUrl + "favourites?id=" + id, {method: 'DELETE'})
+        ).catch(function(error) {
+            alert("Network failure");
+            return Promise.reject(error);
+        }).then(function(response) {
+            return response.status === 200;
+        })
+    }
+
+    addFavourite(id, name) {
+        return this.timeout(
+            3000,
+            fetch(this.baseUrl + "favourites?id=" + id + "&name=" + name, {method: 'POST'})
+        ).catch(function(error) {
+            alert("Network failure");
+            return Promise.reject(error);
+        }).then(function(response) {
+            return response.status === 201;
         })
     }
 }
 
-api = new OpenWeatherApi("17687eb6fa5e965d701ccd333cb1d32d");
+const api = new Api();
 
 document.body.onload = function() {
     document.querySelector("#add-city-form").addEventListener("submit", event => addCityClick(event));
     document.querySelector("#update-geo-button").addEventListener("click", updateGeo);
 
     updateGeo();
-    loadCitiesFromLocalStorage();
+    loadFavourites();
 }
 
 function removeMainCityLoader() {
@@ -67,29 +104,56 @@ function updateGeo() {
     let longitude = 30.3084;
 
     geo.getCurrentPosition(position => {
-        api.getWeatherByCoordinates(position.coords.latitude, position.coords.longitude);
+        let response = api.getWeatherByCoordinates(position.coords.latitude, position.coords.longitude);
+        response.then(data => {
+            loadMainCity(data);
+        })
     }, () => {
-        api.getWeatherByCoordinates(latitude, longitude);
+        api.getWeatherByCoordinates(latitude, longitude).then(data => {
+            loadMainCity(data);
+        });
     })
 }
 
 function addCityClick(event) {
+    let button = event.target.querySelector("button")
+
+    if (button.disabled) {
+        return;
+    }
+
+    button.disabled = true;
+
     event.preventDefault();
     let cityName = event.target.querySelector("input").value;
     if (!cityName || cityName.trim().length === 0) {
         alert("City name is empty");
+        button.disabled = false;
         return;
     }
 
-    addCityByName(cityName);
+    let response = api.getWeatherByCityName(cityName);
+
+    response.then(data => {
+        if (data === 404) {
+            alert("City does not exist");
+            button.disabled = false;
+            return;
+        }
+
+        api.addFavourite(data.id, data.name).then(status => {
+            if (status === true) {
+                addCityByName(cityName);
+                button.disabled = false;
+            } else {
+                alert("City already exists!");
+                button.disabled = false;
+            }
+        })
+    })
 }
 
-function addCityByName(cityName, checkLocalStorage = true) {
-    if (checkLocalStorage && existsInLocalStorage(cityName)) {
-        alert("City is already exists");
-        return;
-    }
-
+function addCityByName(cityName) {
     let tmpl = document.querySelector("#weather-template");
     let cities = document.querySelector(".cities");
     let clone = document.importNode(tmpl.content, true);
@@ -99,19 +163,6 @@ function addCityByName(cityName, checkLocalStorage = true) {
     let response = api.getWeatherByCityName(cityName);
 
     response.then(data => {
-        if (data["cod"] !== 200) {
-            createdCity.remove();
-            alert("City not found");
-            return;
-        }
-
-        if (checkLocalStorage && localStorage.getItem("city_" + data["id"]) !== null) {
-            createdCity.remove();
-            alert("City is already exists");
-            return;
-        }
-
-        localStorage.setItem("city_" + data["id"], data["name"].toLowerCase());
         document.getElementById("add-city-input").textContent = "";
 
         createdCity.id = "city_" + data["id"];
@@ -162,33 +213,31 @@ function loadMainCity(json) {
 }
 
 function deleteCity() {
-    localStorage.removeItem(this.id);
-    document.querySelector("#" + this.id).remove();
-}
+    let city = document.querySelector("#" + this.id);
 
-function loadCitiesFromLocalStorage() {
-    for (let i = 0; i < localStorage.length; i++) {
-        let key = localStorage.key(i);
-        if (!key.startsWith("city_")) {
-            continue;
-        }
-        addCityByName(localStorage.getItem(key), false);
-    }
-}
-
-function existsInLocalStorage(cityName) {
-    cityName = cityName.toLowerCase();
-    for (let i = 0; i < localStorage.length; i++) {
-        let key = localStorage.key(i);
-        if (!key.startsWith("city_")) {
-            continue;
-        }
-        if (localStorage.getItem(key) === cityName) {
-            return true;
-        }
+    if (city.disabled) {
+        return;
     }
 
-    return false;
+    city.disabled = true;
+
+    api.deleteFavourite(this.id.split("_")[1]).then(result => {
+        if (!result) {
+            alert("Error");
+            return;
+        }
+        document.querySelector("#" + this.id).remove();
+    });
+}
+
+function loadFavourites() {
+    let favourites = api.getFavourites();
+
+    favourites.then(data => {
+        data.forEach((item) => {
+            addCityByName(item.name);
+        })
+    })
 }
 
 function degToDirection(num) {

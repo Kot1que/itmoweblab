@@ -1,18 +1,18 @@
 const express = require('express');
 const path = require('path');
-const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 
-const router = require('./router');
+const weatherRouter = require('./router/weatherRouter');
+const favouritesRouter = require('./router/favouritesRouter');
 
 const app = express();
 
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.use('/api', router);
+app.use('/weather', weatherRouter);
+app.use('/favourites', favouritesRouter);
 
 module.exports = app;
