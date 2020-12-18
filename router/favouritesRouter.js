@@ -8,7 +8,7 @@ router.get('/', (req, res) => {
             res.status(500).send();
             return;
         }
-        res.json(rows).send();
+        res.json(rows);
     })
 })
 
@@ -24,7 +24,7 @@ router.post('/', (req, res) => {
             res.status(500).send();
             return;
         }
-        res.status(201).send();
+        res.status(201).json("201");
     })
 })
 
@@ -34,7 +34,7 @@ router.delete('/', (req, res) => {
             res.status(500).send();
             return;
         }
-        res.status(200).send();
+        res.status(200).json("200");
     })
 })
 

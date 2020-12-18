@@ -33,7 +33,7 @@ router.get('/city', function(req, res) {
             res.status(404).send();
             return;
         }
-        res.json(data).send();
+        res.json(data);
     })
 });
 
@@ -55,8 +55,7 @@ router.get('/coordinates', function(req, res) {
             res.status(404).send();
             return;
         }
-
-        res.json(data).send();
+        res.json(data);
     })
 });
 
