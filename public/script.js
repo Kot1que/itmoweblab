@@ -14,7 +14,7 @@ class Api {
 
     getWeatherByCityName(city) {
         return this.timeout(
-            3000,
+            30000,
             fetch(this.baseUrl + "weather/city?q=" + city)
         ).catch(function(error) {
             alert("Network failure");
@@ -29,7 +29,7 @@ class Api {
 
     getWeatherByCoordinates(latitude, longitude) {
         return this.timeout(
-            3000,
+            30000,
             fetch(this.baseUrl + "weather/coordinates?lon=" + longitude + "&lat=" + latitude)
         ).catch(function(error) {
             alert("Network failure");
@@ -41,7 +41,7 @@ class Api {
 
     getFavourites() {
         return this.timeout(
-            3000,
+            30000,
             fetch(this.baseUrl + "favourites")
         ).catch(function(error) {
             alert("Network failure");
@@ -53,7 +53,7 @@ class Api {
 
     deleteFavourite(id) {
         return this.timeout(
-            3000,
+            30000,
             fetch(this.baseUrl + "favourites?id=" + id, {method: 'DELETE'})
         ).catch(function(error) {
             alert("Network failure");
@@ -65,7 +65,7 @@ class Api {
 
     addFavourite(id, name) {
         return this.timeout(
-            3000,
+            30000,
             fetch(this.baseUrl + "favourites?id=" + id + "&name=" + name, {method: 'POST'})
         ).catch(function(error) {
             alert("Network failure");
@@ -123,12 +123,14 @@ function addCityClick(event) {
     }
 
     button.disabled = true;
+    buttonLoadingEnable(button);
 
     event.preventDefault();
     let cityName = event.target.querySelector("input").value;
     if (!cityName || cityName.trim().length === 0) {
         alert("City name is empty");
         button.disabled = false;
+        buttonLoadingDisable(button);
         return;
     }
 
@@ -138,44 +140,55 @@ function addCityClick(event) {
         if (data === 404) {
             alert("City does not exist");
             button.disabled = false;
+            buttonLoadingDisable(button);
             return;
         }
 
         api.addFavourite(data.id, data.name).then(status => {
             if (status === true) {
-                addCityByName(cityName);
+                addCity(data);
                 button.disabled = false;
+                buttonLoadingDisable(button);
             } else {
                 alert("City already exists!");
                 button.disabled = false;
+                buttonLoadingDisable(button);
             }
         })
     })
 }
 
-function addCityByName(cityName) {
+function buttonLoadingEnable(button) {
+    button = button.querySelector("i");
+    button.classList.remove("fa-plus");
+    button.classList.add("fa-spinner");
+    button.classList.add("fa-spin");
+}
+
+function buttonLoadingDisable(button) {
+    button = button.querySelector("i");
+    button.classList.add("fa-plus");
+    button.classList.remove("fa-spinner");
+    button.classList.remove("fa-spin");
+}
+
+function addCity(cityData) {
     let tmpl = document.querySelector("#weather-template");
     let cities = document.querySelector(".cities");
     let clone = document.importNode(tmpl.content, true);
     cities.appendChild(clone);
     let createdCity = cities.lastElementChild;
 
-    let response = api.getWeatherByCityName(cityName);
+    document.getElementById("add-city-input").textContent = "";
 
-    response.then(data => {
-        document.getElementById("add-city-input").textContent = "";
+    createdCity.id = "city_" + cityData["id"];
+    createdCity.querySelector(".delete-city-button").id = createdCity.id;
 
-        createdCity.id = "city_" + data["id"];
-        createdCity.querySelector(".delete-city-button").id = createdCity.id;
+    fillCity(cityData, createdCity.querySelector(".city"));
 
-        fillCity(data, createdCity.querySelector(".city"));
-
-        createdCity.querySelector(".loader-wrapper").style.display = "none";
-        createdCity.querySelector(".city").style.display = "unset";
-        createdCity.querySelector(".delete-city-button").addEventListener("click", deleteCity);
-    }).catch(() => {
-        createdCity.remove();
-    });
+    createdCity.querySelector(".loader-wrapper").style.display = "none";
+    createdCity.querySelector(".city").style.display = "unset";
+    createdCity.querySelector(".delete-city-button").addEventListener("click", deleteCity);
 
     document.querySelector("#add-city-input").value = "";
 }
@@ -235,7 +248,9 @@ function loadFavourites() {
 
     favourites.then(data => {
         data.forEach((item) => {
-            addCityByName(item.name);
+            api.getWeatherByCityName(item.name).then(data => {
+                addCity(data);
+            });
         })
     })
 }
