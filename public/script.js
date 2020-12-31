@@ -155,6 +155,9 @@ function addCityClick(event) {
                 buttonLoadingDisable(button);
             }
         })
+    }).catch(() => {
+        button.disabled = false;
+        buttonLoadingDisable(button);
     })
 }
 
